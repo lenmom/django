@@ -32,7 +32,6 @@ from django.http import HttpResponse
 from django.test import (
     RequestFactory, TestCase, ignore_warnings, override_settings,
 )
-from django.test.utils import patch_logger
 from django.utils import timezone
 
 from .models import SessionStore as CustomDatabaseSession
@@ -312,12 +311,11 @@ class SessionTestsMixin:
         self.assertEqual(self.session.decode(encoded), data)
 
     def test_decode_failure_logged_to_security(self):
-        bad_encode = base64.b64encode(b'flaskdj:alkdjf')
-        with patch_logger('django.security.SuspiciousSession', 'warning') as calls:
+        bad_encode = base64.b64encode(b'flaskdj:alkdjf').decode('ascii')
+        with self.assertLogs('django.security.SuspiciousSession', 'WARNING') as cm:
             self.assertEqual({}, self.session.decode(bad_encode))
-            # check that the failed decode is logged
-            self.assertEqual(len(calls), 1)
-            self.assertIn('corrupted', calls[0])
+        # The failed decode is logged.
+        self.assertIn('corrupted', cm.output[0])
 
     def test_actual_expiry(self):
         # this doesn't work with JSONSerializer (serializing timedelta)
@@ -627,10 +625,11 @@ class CacheSessionTests(SessionTestsMixin, unittest.TestCase):
 
 
 class SessionMiddlewareTests(TestCase):
+    request_factory = RequestFactory()
 
     @override_settings(SESSION_COOKIE_SECURE=True)
     def test_secure_session_cookie(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -644,7 +643,7 @@ class SessionMiddlewareTests(TestCase):
 
     @override_settings(SESSION_COOKIE_HTTPONLY=True)
     def test_httponly_session_cookie(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -662,7 +661,7 @@ class SessionMiddlewareTests(TestCase):
 
     @override_settings(SESSION_COOKIE_SAMESITE='Strict')
     def test_samesite_session_cookie(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse()
         middleware = SessionMiddleware()
         middleware.process_request(request)
@@ -672,7 +671,7 @@ class SessionMiddlewareTests(TestCase):
 
     @override_settings(SESSION_COOKIE_HTTPONLY=False)
     def test_no_httponly_session_cookie(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -689,7 +688,7 @@ class SessionMiddlewareTests(TestCase):
         )
 
     def test_session_save_on_500(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Horrible error')
         response.status_code = 500
         middleware = SessionMiddleware()
@@ -706,7 +705,7 @@ class SessionMiddlewareTests(TestCase):
 
     def test_session_update_error_redirect(self):
         path = '/foo/'
-        request = RequestFactory().get(path)
+        request = self.request_factory.get(path)
         response = HttpResponse()
         middleware = SessionMiddleware()
 
@@ -725,7 +724,7 @@ class SessionMiddlewareTests(TestCase):
             middleware.process_response(request, response)
 
     def test_session_delete_on_end(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -752,7 +751,7 @@ class SessionMiddlewareTests(TestCase):
 
     @override_settings(SESSION_COOKIE_DOMAIN='.example.local', SESSION_COOKIE_PATH='/example/')
     def test_session_delete_on_end_with_custom_domain_and_path(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -780,7 +779,7 @@ class SessionMiddlewareTests(TestCase):
         )
 
     def test_flush_empty_without_session_cookie_doesnt_set_cookie(self):
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 
@@ -801,7 +800,7 @@ class SessionMiddlewareTests(TestCase):
         If a session is emptied of data but still has a key, it should still
         be updated.
         """
-        request = RequestFactory().get('/')
+        request = self.request_factory.get('/')
         response = HttpResponse('Session test')
         middleware = SessionMiddleware()
 

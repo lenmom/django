@@ -77,11 +77,16 @@ class IntrospectionTests(TransactionTestCase):
             desc = connection.introspection.get_table_description(cursor, Reporter._meta.db_table)
         self.assertEqual(
             [datatype(r[1], r) for r in desc],
-            ['AutoField' if connection.features.can_introspect_autofield else 'IntegerField',
-             'CharField', 'CharField', 'CharField',
-             'BigIntegerField' if connection.features.can_introspect_big_integer_field else 'IntegerField',
-             'BinaryField' if connection.features.can_introspect_binary_field else 'TextField',
-             'SmallIntegerField' if connection.features.can_introspect_small_integer_field else 'IntegerField']
+            [
+                'AutoField' if connection.features.can_introspect_autofield else 'IntegerField',
+                'CharField',
+                'CharField',
+                'CharField',
+                'BigIntegerField' if connection.features.can_introspect_big_integer_field else 'IntegerField',
+                'BinaryField' if connection.features.can_introspect_binary_field else 'TextField',
+                'SmallIntegerField' if connection.features.can_introspect_small_integer_field else 'IntegerField',
+                'DurationField' if connection.features.can_introspect_duration_field else 'BigIntegerField',
+            ]
         )
 
     def test_get_table_description_col_lengths(self):
@@ -98,14 +103,14 @@ class IntrospectionTests(TransactionTestCase):
         nullable_by_backend = connection.features.interprets_empty_strings_as_nulls
         self.assertEqual(
             [r[6] for r in desc],
-            [False, nullable_by_backend, nullable_by_backend, nullable_by_backend, True, True, False]
+            [False, nullable_by_backend, nullable_by_backend, nullable_by_backend, True, True, False, False]
         )
 
     @skipUnlessDBFeature('can_introspect_autofield')
     def test_bigautofield(self):
         with connection.cursor() as cursor:
             desc = connection.introspection.get_table_description(cursor, City._meta.db_table)
-        self.assertIn('BigAutoField', [datatype(r[1], r) for r in desc])
+        self.assertIn(connection.features.introspected_big_auto_field_type, [datatype(r[1], r) for r in desc])
 
     # Regression test for #9991 - 'real' types in postgres
     @skipUnlessDBFeature('has_real_datatype')
@@ -158,10 +163,10 @@ class IntrospectionTests(TransactionTestCase):
     def test_get_key_columns(self):
         with connection.cursor() as cursor:
             key_columns = connection.introspection.get_key_columns(cursor, Article._meta.db_table)
-        self.assertEqual(
-            set(key_columns),
-            {('reporter_id', Reporter._meta.db_table, 'id'),
-             ('response_to_id', Article._meta.db_table, 'id')})
+        self.assertEqual(set(key_columns), {
+            ('reporter_id', Reporter._meta.db_table, 'id'),
+            ('response_to_id', Article._meta.db_table, 'id'),
+        })
 
     def test_get_primary_key_column(self):
         with connection.cursor() as cursor:

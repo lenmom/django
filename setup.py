@@ -83,7 +83,7 @@ setup(
     entry_points={'console_scripts': [
         'django-admin = django.core.management:execute_from_command_line',
     ]},
-    install_requires=['pytz'],
+    install_requires=['pytz', 'sqlparse'],
     extras_require={
         "bcrypt": ["bcrypt"],
         "argon2": ["argon2-cffi >= 16.1.0"],
@@ -100,6 +100,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
         'Programming Language :: Python :: 3 :: Only',
         'Topic :: Internet :: WWW/HTTP',
         'Topic :: Internet :: WWW/HTTP :: Dynamic Content',
@@ -107,6 +108,12 @@ setup(
         'Topic :: Software Development :: Libraries :: Application Frameworks',
         'Topic :: Software Development :: Libraries :: Python Modules',
     ],
+    project_urls={
+        'Documentation': 'https://docs.djangoproject.com/',
+        'Funding': 'https://www.djangoproject.com/fundraising/',
+        'Source': 'https://github.com/django/django',
+        'Tracker': 'https://code.djangoproject.com/',
+    },
 )
 
 

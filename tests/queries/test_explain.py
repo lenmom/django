@@ -2,8 +2,11 @@ import unittest
 
 from django.db import NotSupportedError, connection, transaction
 from django.db.models import Count
-from django.test import TestCase, skipIfDBFeature, skipUnlessDBFeature
+from django.test import (
+    TestCase, ignore_warnings, skipIfDBFeature, skipUnlessDBFeature,
+)
 from django.test.utils import CaptureQueriesContext
+from django.utils.deprecation import RemovedInDjango31Warning
 
 from .models import Tag
 
@@ -11,6 +14,7 @@ from .models import Tag
 @skipUnlessDBFeature('supports_explaining_query_execution')
 class ExplainTests(TestCase):
 
+    @ignore_warnings(category=RemovedInDjango31Warning)
     def test_basic(self):
         querysets = [
             Tag.objects.filter(name='test'),
@@ -69,6 +73,9 @@ class ExplainTests(TestCase):
 
     @unittest.skipUnless(connection.vendor == 'mysql', 'MySQL specific')
     def test_mysql_text_to_traditional(self):
+        # Initialize the cached property, if needed, to prevent a query for
+        # the MySQL version during the QuerySet evaluation.
+        connection.features.needs_explain_extended
         with CaptureQueriesContext(connection) as captured_queries:
             Tag.objects.filter(name='test').explain(format='text')
         self.assertEqual(len(captured_queries), 1)

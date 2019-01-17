@@ -19,7 +19,7 @@ __all__ = ['ArrayField']
 class ArrayField(CheckFieldDefaultMixin, Field):
     empty_strings_allowed = False
     default_error_messages = {
-        'item_invalid': _('Item %(nth)s in the array did not validate: '),
+        'item_invalid': _('Item %(nth)s in the array did not validate:'),
         'nested_array_mismatch': _('Nested arrays must have the same length.'),
     }
     _default_hint = ('list', '[]')
@@ -28,8 +28,7 @@ class ArrayField(CheckFieldDefaultMixin, Field):
         self.base_field = base_field
         self.size = size
         if self.size:
-            self.default_validators = self.default_validators[:]
-            self.default_validators.append(ArrayMaxLengthValidator(self.size))
+            self.default_validators = [*self.default_validators, ArrayMaxLengthValidator(self.size)]
         # For performance, only add a from_db_value() method if the base field
         # implements it.
         if hasattr(self.base_field, 'from_db_value'):
@@ -83,6 +82,9 @@ class ArrayField(CheckFieldDefaultMixin, Field):
     def db_type(self, connection):
         size = self.size or ''
         return '%s[%s]' % (self.base_field.db_type(connection), size)
+
+    def get_placeholder(self, value, compiler, connection):
+        return '%s::{}'.format(self.db_type(connection))
 
     def get_db_prep_value(self, value, connection, prepared=False):
         if isinstance(value, (list, tuple)):

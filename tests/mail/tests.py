@@ -8,7 +8,7 @@ import socket
 import sys
 import tempfile
 import threading
-from email import message_from_binary_file, message_from_bytes
+from email import charset, message_from_binary_file, message_from_bytes
 from email.header import Header
 from email.mime.text import MIMEText
 from email.utils import parseaddr
@@ -323,9 +323,13 @@ class MailTests(HeadersCheckMixin, SimpleTestCase):
         )
 
     def test_unicode_headers(self):
-        email = EmailMessage("Gżegżółka", "Content", "from@example.com", ["to@example.com"],
-                             headers={"Sender": '"Firstname Sürname" <sender@example.com>',
-                                      "Comments": 'My Sürname is non-ASCII'})
+        email = EmailMessage(
+            'Gżegżółka', 'Content', 'from@example.com', ['to@example.com'],
+            headers={
+                'Sender': '"Firstname Sürname" <sender@example.com>',
+                'Comments': 'My Sürname is non-ASCII',
+            },
+        )
         message = email.message()
         self.assertEqual(message['Subject'], '=?utf-8?b?R8W8ZWfFvMOzxYJrYQ==?=')
         self.assertEqual(message['Sender'], '=?utf-8?q?Firstname_S=C3=BCrname?= <sender@example.com>')
@@ -685,6 +689,21 @@ class MailTests(HeadersCheckMixin, SimpleTestCase):
 
         # The child message header is not base64 encoded
         self.assertIn('Child Subject', parent_s)
+
+    def test_custom_utf8_encoding(self):
+        """A UTF-8 charset with a custom body encoding is respected."""
+        body = 'Body with latin characters: àáä.'
+        msg = EmailMessage('Subject', body, 'bounce@example.com', ['to@example.com'])
+        encoding = charset.Charset('utf-8')
+        encoding.body_encoding = charset.QP
+        msg.encoding = encoding
+        message = msg.message()
+        self.assertMessageHasHeaders(message, {
+            ('MIME-Version', '1.0'),
+            ('Content-Type', 'text/plain; charset="utf-8"'),
+            ('Content-Transfer-Encoding', 'quoted-printable'),
+        })
+        self.assertEqual(message.get_payload(), encoding.body_encode(body))
 
     def test_sanitize_address(self):
         """
@@ -1144,7 +1163,7 @@ class ConsoleBackendTests(BaseEmailBackendTests, SimpleTestCase):
 
     def get_mailbox_content(self):
         messages = self.stream.getvalue().split('\n' + ('-' * 79) + '\n')
-        return [message_from_bytes(str(m).encode()) for m in messages if m]
+        return [message_from_bytes(m.encode()) for m in messages if m]
 
     def test_console_stream_kwarg(self):
         """
@@ -1153,7 +1172,7 @@ class ConsoleBackendTests(BaseEmailBackendTests, SimpleTestCase):
         s = StringIO()
         connection = mail.get_connection('django.core.mail.backends.console.EmailBackend', stream=s)
         send_mail('Subject', 'Content', 'from@example.com', ['to@example.com'], connection=connection)
-        message = str(s.getvalue().split('\n' + ('-' * 79) + '\n')[0]).encode()
+        message = s.getvalue().split('\n' + ('-' * 79) + '\n')[0].encode()
         self.assertMessageHasHeaders(message, {
             ('MIME-Version', '1.0'),
             ('Content-Type', 'text/plain; charset="utf-8"'),
@@ -1512,7 +1531,12 @@ class SMTPBackendTests(BaseEmailBackendTests, SMTPBackendTestsBase):
         backend.connection = True
         backend.open = lambda: None
         email = EmailMessage('Subject', 'Content', 'from@example.com', ['to@example.com'])
-        self.assertEqual(backend.send_messages([email]), None)
+        self.assertEqual(backend.send_messages([email]), 0)
+
+    def test_send_messages_empty_list(self):
+        backend = smtp.EmailBackend()
+        backend.connection = True
+        self.assertEqual(backend.send_messages([]), 0)
 
     def test_send_messages_zero_sent(self):
         """A message isn't sent if it doesn't have any recipients."""

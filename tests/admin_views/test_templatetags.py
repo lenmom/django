@@ -14,12 +14,13 @@ from .tests import AdminViewBasicTestCase
 
 
 class AdminTemplateTagsTest(AdminViewBasicTestCase):
+    request_factory = RequestFactory()
+
     def test_submit_row(self):
         """
         submit_row template tag should pass whole context.
         """
-        factory = RequestFactory()
-        request = factory.get(reverse('admin:auth_user_change', args=[self.superuser.pk]))
+        request = self.request_factory.get(reverse('admin:auth_user_change', args=[self.superuser.pk]))
         request.user = self.superuser
         admin = UserAdmin(User, site)
         extra_context = {'extra': True}
@@ -33,9 +34,8 @@ class AdminTemplateTagsTest(AdminViewBasicTestCase):
         admin_modify template tags follow the standard search pattern
         admin/app_label/model/template.html.
         """
-        factory = RequestFactory()
         article = Article.objects.all()[0]
-        request = factory.get(reverse('admin:admin_views_article_change', args=[article.pk]))
+        request = self.request_factory.get(reverse('admin:admin_views_article_change', args=[article.pk]))
         request.user = self.superuser
         admin = ArticleAdmin(Article, site)
         extra_context = {'show_publish': True, 'extra': True}
@@ -53,8 +53,7 @@ class AdminTemplateTagsTest(AdminViewBasicTestCase):
         admin_list template tags follow the standard search pattern
         admin/app_label/model/template.html.
         """
-        factory = RequestFactory()
-        request = factory.get(reverse('admin:admin_views_article_changelist'))
+        request = self.request_factory.get(reverse('admin:admin_views_article_changelist'))
         request.user = self.superuser
         admin = ArticleAdmin(Article, site)
         admin.date_hierarchy = 'date'
@@ -71,6 +70,10 @@ class AdminTemplateTagsTest(AdminViewBasicTestCase):
 
 class DateHierarchyTests(TestCase):
     factory = RequestFactory()
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.superuser = User.objects.create_superuser(username='super', password='secret', email='super@example.com')
 
     def test_choice_links(self):
         modeladmin = ModelAdmin(Question, site)
@@ -97,6 +100,7 @@ class DateHierarchyTests(TestCase):
             with self.subTest(query=query):
                 query = {'posted__%s' % q: val for q, val in query.items()}
                 request = self.factory.get('/', query)
+                request.user = self.superuser
                 changelist = modeladmin.get_changelist_instance(request)
                 spec = date_hierarchy(changelist)
                 choices = [choice['link'] for choice in spec['choices']]

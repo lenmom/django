@@ -152,11 +152,18 @@ class Poll(models.Model):
 
 
 class Question(models.Model):
+    text = models.CharField(max_length=40)
     poll = models.ForeignKey(Poll, models.CASCADE)
 
 
 class Novel(models.Model):
     name = models.CharField(max_length=40)
+
+
+class NovelReadonlyChapter(Novel):
+
+    class Meta:
+        proxy = True
 
 
 class Chapter(models.Model):

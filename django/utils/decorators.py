@@ -2,7 +2,7 @@
 
 # For backwards compatibility in Django 2.0.
 from contextlib import ContextDecorator  # noqa
-from functools import WRAPPER_ASSIGNMENTS, update_wrapper, wraps
+from functools import WRAPPER_ASSIGNMENTS, partial, update_wrapper, wraps
 
 
 class classonlymethod(classmethod):
@@ -36,8 +36,10 @@ def _multi_decorate(decorators, method):
 
     def _wrapper(self, *args, **kwargs):
         # bound_method has the signature that 'decorator' expects i.e. no
-        # 'self' argument.
-        bound_method = method.__get__(self, type(self))
+        # 'self' argument, but it's a closure over self so it can call
+        # 'func'. Also, wrap method.__get__() in a function because new
+        # attributes can't be set on bound method objects, only on functions.
+        bound_method = partial(method.__get__(self, type(self)))
         for dec in decorators:
             bound_method = dec(bound_method)
         return bound_method(*args, **kwargs)
@@ -115,7 +117,7 @@ def decorator_from_middleware(middleware_class):
 def available_attrs(fn):
     """
     Return the list of functools-wrappable attributes on a callable.
-    This was required as a workaround for http://bugs.python.org/issue3445
+    This was required as a workaround for https://bugs.python.org/issue3445
     under Python 2.
     """
     return WRAPPER_ASSIGNMENTS

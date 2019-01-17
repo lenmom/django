@@ -5,7 +5,6 @@ from django.contrib.gis.forms import BaseGeometryWidget, OpenLayersWidget
 from django.contrib.gis.geos import GEOSGeometry
 from django.forms import ValidationError
 from django.test import SimpleTestCase, override_settings
-from django.test.utils import patch_logger
 from django.utils.html import escape
 
 
@@ -70,19 +69,31 @@ class GeometryFieldTest(SimpleTestCase):
 
     def test_to_python(self):
         """
-        Testing to_python returns a correct GEOSGeometry object or
-        a ValidationError
+        to_python() either returns a correct GEOSGeometry object or
+        a ValidationError.
         """
+        good_inputs = [
+            'POINT(5 23)',
+            'MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))',
+            'LINESTRING(0 0, 1 1)',
+        ]
+        bad_inputs = [
+            'POINT(5)',
+            'MULTI   POLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))',
+            'BLAH(0 0, 1 1)',
+            '{"type": "FeatureCollection", "features": ['
+            '{"geometry": {"type": "Point", "coordinates": [508375, 148905]}, "type": "Feature"}]}',
+        ]
         fld = forms.GeometryField()
         # to_python returns the same GEOSGeometry for a WKT
-        for wkt in ('POINT(5 23)', 'MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))', 'LINESTRING(0 0, 1 1)'):
-            with self.subTest(wkt=wkt):
-                self.assertEqual(GEOSGeometry(wkt, srid=fld.widget.map_srid), fld.to_python(wkt))
+        for geo_input in good_inputs:
+            with self.subTest(geo_input=geo_input):
+                self.assertEqual(GEOSGeometry(geo_input, srid=fld.widget.map_srid), fld.to_python(geo_input))
         # but raises a ValidationError for any other string
-        for wkt in ('POINT(5)', 'MULTI   POLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))', 'BLAH(0 0, 1 1)'):
-            with self.subTest(wkt=wkt):
+        for geo_input in bad_inputs:
+            with self.subTest(geo_input=geo_input):
                 with self.assertRaises(forms.ValidationError):
-                    fld.to_python(wkt)
+                    fld.to_python(geo_input)
 
     def test_to_python_different_map_srid(self):
         f = forms.GeometryField(widget=OpenLayersWidget)
@@ -120,7 +131,7 @@ class GeometryFieldTest(SimpleTestCase):
             'pt3': 'PNT(0)',  # invalid
         })
 
-        with patch_logger('django.contrib.gis', 'error') as logger_calls:
+        with self.assertLogs('django.contrib.gis', 'ERROR') as logger_calls:
             output = str(form)
 
         # The first point can't use assertInHTML() due to non-deterministic
@@ -142,9 +153,9 @@ class GeometryFieldTest(SimpleTestCase):
         )
         # Only the invalid PNT(0) triggers an error log entry.
         # Deserialization is called in form clean and in widget rendering.
-        self.assertEqual(len(logger_calls), 2)
+        self.assertEqual(len(logger_calls.records), 2)
         self.assertEqual(
-            logger_calls[0],
+            logger_calls.records[0].getMessage(),
             "Error creating geometry from value 'PNT(0)' (String input "
             "unrecognized as WKT EWKT, and HEXEWKB.)"
         )

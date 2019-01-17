@@ -1,6 +1,6 @@
 from django.conf import settings
 from django.template import Library, Node, TemplateSyntaxError, Variable
-from django.template.base import TOKEN_TEXT, TOKEN_VAR, render_value_in_context
+from django.template.base import TokenType, render_value_in_context
 from django.template.defaulttags import token_kwargs
 from django.utils import translation
 from django.utils.safestring import SafeData, mark_safe
@@ -112,9 +112,9 @@ class BlockTranslateNode(Node):
         result = []
         vars = []
         for token in tokens:
-            if token.token_type == TOKEN_TEXT:
+            if token.token_type == TokenType.TEXT:
                 result.append(token.contents.replace('%', '%%'))
-            elif token.token_type == TOKEN_VAR:
+            elif token.token_type == TokenType.VAR:
                 result.append('%%(%s)s' % token.contents)
                 vars.append(token.contents)
         msg = ''.join(result)
@@ -127,12 +127,9 @@ class BlockTranslateNode(Node):
             message_context = self.message_context.resolve(context)
         else:
             message_context = None
-        tmp_context = {}
-        for var, val in self.extra_context.items():
-            tmp_context[var] = val.resolve(context)
         # Update() works like a push(), so corresponding context.pop() is at
         # the end of function
-        context.update(tmp_context)
+        context.update({var: val.resolve(context) for var, val in self.extra_context.items()})
         singular, vars = self.render_token_list(self.singular)
         if self.plural and self.countervar and self.counter:
             count = self.counter.resolve(context)
@@ -510,7 +507,7 @@ def do_block_translate(parser, token):
     plural = []
     while parser.tokens:
         token = parser.next_token()
-        if token.token_type in (TOKEN_VAR, TOKEN_TEXT):
+        if token.token_type in (TokenType.VAR, TokenType.TEXT):
             singular.append(token)
         else:
             break
@@ -519,7 +516,7 @@ def do_block_translate(parser, token):
             raise TemplateSyntaxError("'blocktrans' doesn't allow other block tags inside it")
         while parser.tokens:
             token = parser.next_token()
-            if token.token_type in (TOKEN_VAR, TOKEN_TEXT):
+            if token.token_type in (TokenType.VAR, TokenType.TEXT):
                 plural.append(token)
             else:
                 break
